@@ -15,6 +15,7 @@ def main():
     reg["version"].path
 """
 
+# Privileges required for opening keys
 KEY_READ = 0x20019
 KEY_WRITE = 0x20006
 KEY_READ_WRITE = KEY_READ | KEY_WRITE
@@ -37,6 +38,9 @@ class RegistryKeyNotEditable(Exception): pass
 
 
 def require_editable(f):
+    """
+    Makes sure the registry key is editable before trying to edit it.
+    """
     def wrapper(self, *args, **kwargs):
         if not self._edit:
             raise RegistryKeyNotEditable("The key is not set as editable.")
@@ -46,6 +50,10 @@ def require_editable(f):
 
 
 class RegValue(object):
+    """
+    Baseclass for registry values.
+    Only used as baseclass.
+    """
     def __init__(self, value):
         self._value = value
 
@@ -88,6 +96,9 @@ REG_VALUE_TYPE_MAP = {cls.TYPE: cls for cls in (RegSZ, RegExpandSZ, RegBinary, R
 
 
 def parse_value(named_reg_value):
+    """
+    Convert the value returned from EnumValue to a (name, value) tuple using the value classes.
+    """
     name, value, value_type = named_reg_value
     value_class = REG_VALUE_TYPE_MAP[value_type]
     return name, value_class(value)
@@ -98,14 +109,18 @@ class ValueHandler(object):
         self._key = key
 
     def __getitem__(self, name):
+        # Get item by its name.
         if isinstance(name, types.StringTypes):
             for value_name, value in self._key.enum_values():
                 if value_name == name:
                     return value
+
+        # Get an item by its index. Provided to support the sequence protocol.
         elif isinstance(name, types.IntType):
             try:
                 return self._key._enum_value(name)
             except WindowsError as e:
+                # On exception, make sure it is the last value and raise StopIteration.
                 if e.winerror != 259:
                     raise
                 if not name < self._key.get_info().values:
@@ -145,17 +160,16 @@ class RegistryKey(object):
         )
 
     def _open_key(self, key, subkey, edit=False):
-        hkey = key
-        if isinstance(key, RegistryKey):
-            hkey = key.key
+        # Get a key-subkey pair, `key` can be a key, a string or an instance.
+        hkey, subkey = self._parse_key(key, subkey)
 
-        elif isinstance(key, types.StringTypes):
-            hkey, subkey = self._parse_key(key, subkey)
-
+        # Set key permissions
         if edit:
             options = KEY_READ_WRITE
         else:
             options = KEY_READ
+
+        # Open the key
         self._key = OpenKeyEx(hkey, subkey, 0, options)
 
     def _get_key_path(self, key):
@@ -178,9 +192,17 @@ class RegistryKey(object):
         return RegistryKey(self, subkey)
 
     def get_editable(self):
+        """
+        Get an editable copy of the key.
+        Will open the key.
+        """
         return RegistryKey(self, subkey=None, edit=True)
 
     def get_non_editable(self):
+        """
+        Get an non-editable copy of the key.
+        Will open the key.
+        """
         return RegistryKey(self, subkey=None, edit=False)
 
     def get_info(self):
@@ -207,8 +229,15 @@ class RegistryKey(object):
             yield self._enum_key(index)
 
     def _parse_key(self, key, subkey):
+        if isinstance(key, RegistryKey):
+            return key.key, subkey
+
         if not isinstance(key, types.StringTypes):
             return key, subkey
+
+        # We got thus far, so `key` is a string.
+        # Convert the root of the key-path to an HKEY value,
+        # join the rest with the subkey path.
 
         parts = key.split(os.path.sep, 1)
         root = parts.pop(0)
@@ -229,14 +258,9 @@ class RegistryKey(object):
         return hkey, subkey_path
 
 
-def enum_key_values(key):
-    subkeys, values, modified = QueryInfoKey(key)
-    for index in xrange(values):
-        yield EnumValue(key, index)
-
-
 if __name__ == '__main__':
-    key = RegistryKey(r"HKEY_CURRENT_USER\Tamir", edit=False)
+    key = RegistryKey(r"HKEY_CURRENT_USER", edit=False)
+    key = key["Tamir"]
     print key
     key = key.get_editable()
     print key
