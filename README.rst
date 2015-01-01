@@ -5,6 +5,8 @@ Easy Windows-Registry display & manipulation in Python.
 
 .. code:: python
 
+    from rage import RegistryKey
+
     key = RegistryKey("HKEY_CLASSES_ROOT")
     subkey = key[".txt"]
 
