@@ -189,7 +189,22 @@ class RegistryKey(object):
         return self._key
 
     def __getitem__(self, subkey):
-        return RegistryKey(self, subkey)
+        try:
+            return RegistryKey(self, subkey)
+        except WindowsError as e:
+            # If the subkey cannot be found
+            if e.winerror == 2:
+                raise KeyError("Subkey does not exist: {}".format(
+                    os.path.join(self.path,subkey)),
+                )
+            raise
+
+    @require_editable
+    def add_subkey(self, name):
+        """
+        Add a new subkey and return it.
+        """
+        return CreateKeyEx(self.key, name, 0, KEY_READ)
 
     def get_editable(self):
         """
@@ -274,3 +289,5 @@ if __name__ == '__main__':
 
     for name, value in key.values:
         print name, value
+
+    key.add_subkey("Tamir")
