@@ -138,9 +138,10 @@ class RegistryKey(object):
 
 
     def __repr__(self):
-        return "{}({})".format(
+        return "{}({}, edit={})".format(
             self.__class__.__name__,
-            repr(self.path)
+            repr(self.path),
+            self._edit
         )
 
     def _open_key(self, key, subkey, edit=False):
@@ -175,6 +176,12 @@ class RegistryKey(object):
 
     def __getitem__(self, subkey):
         return RegistryKey(self, subkey)
+
+    def get_editable(self):
+        return RegistryKey(self, subkey=None, edit=True)
+
+    def get_non_editable(self):
+        return RegistryKey(self, subkey=None, edit=False)
 
     def get_info(self):
         return KeyInfo(*QueryInfoKey(self.key))
@@ -229,11 +236,17 @@ def enum_key_values(key):
 
 
 if __name__ == '__main__':
-    key = RegistryKey(r"HKEY_CURRENT_USER\Tamir", edit=True)
+    key = RegistryKey(r"HKEY_CURRENT_USER\Tamir", edit=False)
+    print key
+    key = key.get_editable()
+    print key
     print list(key.enum_values())
     key.set_value("a", RegSZ("a"))
     key.set_value("b", RegExpandSZ("x"))
     key.set_value("c", RegMultiSZ(["a", "s", "c"]))
     print key.get_info()
     print list(key.values)
-    key.values["a"] = RegSZ("This works!")
+    key.values["a b"] = RegSZ("This works!")
+
+    for name, value in key.values:
+        print name, value
