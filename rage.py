@@ -182,7 +182,7 @@ class RegistryKey(object):
 
     @property
     def path(self):
-        return self._path
+        return self._path.strip(os.path.sep)
 
     @property
     def key(self):
@@ -243,6 +243,16 @@ class RegistryKey(object):
         for index in xrange(subkeys):
             yield self._enum_key(index)
 
+    def get_parent_key(self):
+        path = self.path
+
+        try:
+            parent, current = path.rstrip(os.path.sep).rsplit(os.path.sep, 1)
+        except:
+            raise ValueError("No parent key.")
+
+        return RegistryKey(key=parent)
+
     def _parse_key(self, key, subkey):
         if isinstance(key, RegistryKey):
             return key.key, subkey
@@ -290,4 +300,4 @@ if __name__ == '__main__':
     for name, value in key.values:
         print name, value
 
-    key.add_subkey("Tamir")
+    print key["Tamir"].get_parent_key()
