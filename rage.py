@@ -4,17 +4,6 @@ import collections
 import os.path
 
 
-"""
-def main():
-    reg = Reg.HKCU["Software\\7-Zip"]
-    reg = Reg(HKCU)["Software\\7-zip"]
-
-    reg.values -> dict
-    reg.values[name] = String(value)
-
-    reg["version"].path
-"""
-
 # Privileges required for opening keys
 KEY_READ = 0x20019
 KEY_WRITE = 0x20006
