@@ -10,7 +10,7 @@ def read(*paths):
 setup(
     name='rage',
     version='0.1.0',
-    py_modules=['rage'],
+    packages=['rage'],
     url='https://github.com/tmr232/rage',
     license='MIT',
     author='Tamir Bahar',
