@@ -41,6 +41,7 @@ def require_editable(f):
     """
     Makes sure the registry key is editable before trying to edit it.
     """
+
     def wrapper(self, *args, **kwargs):
         if not self._edit:
             raise RegistryKeyNotEditable("The key is not set as editable.")
@@ -54,6 +55,7 @@ class RegValue(object):
     Baseclass for registry values.
     Only used as baseclass.
     """
+
     def __init__(self, value):
         self._value = value
 
@@ -196,13 +198,16 @@ class RegistryKey(object):
         return self._key
 
     def __getitem__(self, subkey):
+        return self.open_subkey(subkey, edit=self._edit)
+
+    def open_subkey(self, subkey, edit=False):
         try:
-            return RegistryKey(self, subkey)
+            return RegistryKey(self, subkey, edit=edit)
         except WindowsError as e:
             # If the subkey cannot be found
             if e.winerror == 2:
                 raise KeyError("Subkey does not exist: {}".format(
-                    os.path.join(self.path,subkey)),
+                    os.path.join(self.path, subkey)),
                 )
             raise
 
@@ -212,6 +217,17 @@ class RegistryKey(object):
         Add a new subkey and return it.
         """
         return CreateKeyEx(self.key, name, 0, KEY_READ)
+
+    @require_editable
+    def delete_subkey(self, subkey_path, recurse=False):
+        # Delete the subkey's subkeys
+        if recurse:
+            subkey = self[subkey_path]
+            for name in subkey.iter_subkey_names():
+                subkey.delete_subkey(name)
+
+        # Delete the subkey
+        DeleteKey(self.key, subkey_path)
 
     def get_editable(self):
         """
@@ -249,6 +265,13 @@ class RegistryKey(object):
         subkeys, values, modified = self.get_info()
         for index in xrange(subkeys):
             yield self._enum_key(index)
+
+    def iter_subkey_names(self):
+        return self.enum_keys()
+
+    def iter_subkeys(self, edit=False):
+        for subkey_name in self.iter_subkey_names():
+            return self.open_subkey(subkey_name, edit=edit)
 
     def get_parent_key(self):
         path = self.path
@@ -311,3 +334,5 @@ if __name__ == '__main__':
 
     key.add_subkey("Tamir")
     print key["Tamir"].get_parent_key()
+
+    key.delete_subkey("Tamir")

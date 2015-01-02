@@ -24,3 +24,9 @@ Easy Windows-Registry display & manipulation in Python.
     # Set one of the values
     editable_subkey = subkey.get_editable()
     editable_subkey.values["my value name"] = RegSZ("Value value!")
+
+    # Delete a value
+    del editable_subkey.values["value to delete"]
+
+    # Delete a subkey
+    editable_subkey.delete_subkey("subkey name", recurse=False)
