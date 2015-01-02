@@ -5,6 +5,8 @@ import os.path
 
 
 # Privileges required for opening keys
+from value import parse_value, ValueHandler
+
 KEY_READ = 0x20019
 KEY_WRITE = 0x20006
 KEY_READ_WRITE = KEY_READ | KEY_WRITE
@@ -39,98 +41,11 @@ def require_editable(f):
     return wrapper
 
 
-class RegValue(object):
-    """
-    Baseclass for registry values.
-    Only used as baseclass.
-    """
-
-    def __init__(self, value):
-        self._value = value
-
-    @property
-    def value(self):
-        return self._value
-
-    @property
-    def value_type(self):
-        return self.TYPE
-
-    def __repr__(self):
-        return "{}({})".format(
-            self.__class__.__name__,
-            repr(self.value)
-        )
-
-
-class RegSZ(RegValue):
-    TYPE = REG_SZ
-
-
-class RegExpandSZ(RegValue):
-    TYPE = REG_EXPAND_SZ
-
-
-class RegBinary(RegValue):
-    TYPE = REG_BINARY
-
-
-class RegDword(RegValue):
-    TYPE = REG_DWORD
-
-
-class RegMultiSZ(RegValue):
-    TYPE = REG_MULTI_SZ
-
-
-REG_VALUE_TYPE_MAP = {cls.TYPE: cls for cls in (RegSZ, RegExpandSZ, RegBinary, RegDword, RegMultiSZ)}
-
-
-def parse_value(named_reg_value):
-    """
-    Convert the value returned from EnumValue to a (name, value) tuple using the value classes.
-    """
-    name, value, value_type = named_reg_value
-    value_class = REG_VALUE_TYPE_MAP[value_type]
-    return name, value_class(value)
-
-
-class ValueHandler(object):
-    def __init__(self, key):
-        self._key = key
-
-    def __getitem__(self, name):
-        # Get item by its name.
-        if isinstance(name, types.StringTypes):
-            for value_name, value in self._key.enum_values():
-                if value_name == name:
-                    return value
-
-        # Get an item by its index. Provided to support the sequence protocol.
-        elif isinstance(name, types.IntType):
-            try:
-                return self._key._enum_value(name)
-            except WindowsError as e:
-                # On exception, make sure it is the last value and raise StopIteration.
-                if e.winerror != 259:
-                    raise
-                if not name < self._key.get_info().values:
-                    raise StopIteration()
-
-        raise ValueError(name)
-
-    def __setitem__(self, name, value):
-        self._key.set_value(name, value)
-
-    def __delitem__(self, name):
-        self._key.delete_value(name)
-
-    def __len__(self):
-        return self._key.get_info().values
-
-
 class RegistryKey(object):
     def __init__(self, key, subkey=None, edit=False):
+        """
+        edit - Whether the key is editable or not. Will affect subkey access as well.
+        """
         if subkey is None:
             subkey = ""
 
@@ -141,6 +56,17 @@ class RegistryKey(object):
 
         self._edit = edit
 
+    def __repr__(self):
+        return "{}({}, edit={})".format(
+            self.__class__.__name__,
+            repr(self.path),
+            self._edit
+        )
+
+    def __getitem__(self, subkey):
+        return self.open_subkey(subkey, edit=self._edit)
+
+
     @require_editable
     def set_value(self, name, value):
         SetValueEx(self.key, name, 0, value.value_type, value.value)
@@ -148,14 +74,6 @@ class RegistryKey(object):
     @require_editable
     def delete_value(self, value_name):
         DeleteValue(self._key, value_name)
-
-
-    def __repr__(self):
-        return "{}({}, edit={})".format(
-            self.__class__.__name__,
-            repr(self.path),
-            self._edit
-        )
 
     def _open_key(self, key, subkey, edit=False):
         # Get a key-subkey pair, `key` can be a key, a string or an instance.
@@ -185,9 +103,6 @@ class RegistryKey(object):
     @property
     def key(self):
         return self._key
-
-    def __getitem__(self, subkey):
-        return self.open_subkey(subkey, edit=self._edit)
 
     def open_subkey(self, subkey, edit=False):
         try:
@@ -238,7 +153,7 @@ class RegistryKey(object):
     def _enum_value(self, index):
         return parse_value(EnumValue(self.key, index))
 
-    def enum_values(self):
+    def _iter_values(self):
         subkeys, values, modified = self.get_info()
         for index in xrange(values):
             yield self._enum_value(index)
@@ -247,16 +162,13 @@ class RegistryKey(object):
     def values(self):
         return ValueHandler(self)
 
-    def _enum_key(self, index):
+    def _get_key_by_index(self, index):
         return EnumKey(self.key, index)
 
-    def enum_keys(self):
+    def iter_subkey_names(self):
         subkeys, values, modified = self.get_info()
         for index in xrange(subkeys):
-            yield self._enum_key(index)
-
-    def iter_subkey_names(self):
-        return self.enum_keys()
+            yield self._get_key_by_index(index)
 
     def iter_subkeys(self, edit=False):
         for subkey_name in self.iter_subkey_names():
@@ -301,27 +213,3 @@ class RegistryKey(object):
 
         return hkey, subkey_path
 
-
-if __name__ == '__main__':
-    key = RegistryKey(r"HKEY_CURRENT_USER", edit=False)
-    key = key["Tamir"]
-    print key
-    key = key.get_editable()
-    print key
-    print list(key.enum_values())
-    key.set_value("a", RegSZ("a"))
-    key.set_value("b", RegExpandSZ("x"))
-    key.set_value("c", RegMultiSZ(["a", "s", "c"]))
-    print key.get_info()
-    print list(key.values)
-    key.values["a b"] = RegSZ("This works!")
-
-    for name, value in key.values:
-        print name, value
-
-    del key.values["b"]
-
-    key.add_subkey("Tamir")
-    print key["Tamir"].get_parent_key()
-
-    key.delete_subkey("Tamir")
