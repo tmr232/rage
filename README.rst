@@ -5,7 +5,7 @@ Easy Windows-Registry display & manipulation in Python.
 
 .. code:: python
 
-    from rage import RegistryKey
+    from rage import RegistryKey, RegSZ
 
     # Open some key
     key = RegistryKey(some_registry_path)
