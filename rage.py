@@ -131,6 +131,9 @@ class ValueHandler(object):
     def __setitem__(self, name, value):
         self._key.set_value(name, value)
 
+    def __delitem__(self, name):
+        self._key.delete_value(name)
+
     def __len__(self):
         return self._key.get_info().values
 
@@ -150,6 +153,10 @@ class RegistryKey(object):
     @require_editable
     def set_value(self, name, value):
         SetValueEx(self.key, name, 0, value.value_type, value.value)
+
+    @require_editable
+    def delete_value(self, value_name):
+        DeleteValue(self._key, value_name)
 
 
     def __repr__(self):
@@ -300,4 +307,7 @@ if __name__ == '__main__':
     for name, value in key.values:
         print name, value
 
+    del key.values["b"]
+
+    key.add_subkey("Tamir")
     print key["Tamir"].get_parent_key()
